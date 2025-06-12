@@ -153,6 +153,9 @@ class IQOptionAPI(object):  # pylint: disable=too-many-instance-attributes
     users_availability = None
     # ------------------
     digital_payout = None
+    # ------------------
+    headers = None
+    cookies = None
 
     def __init__(self, host, username, password, proxies=None):
         """
@@ -926,3 +929,37 @@ class IQOptionAPI(object):  # pylint: disable=too-many-instance-attributes
     @property
     def place_digital_option_v2(self):
         return DigitalOptionsPlaceDigitalOptionV2(self)
+
+    def connect_without_login(self, headers, cookies):
+        """Connect using existing session cookies and ssid."""
+        try:
+            self.session.headers.update(headers)
+            self.session.cookies.update(cookies)
+            cookies_dict = self.session.cookies.get_dict()
+            logging.info(f"Connecting with cookies: {cookies_dict}")
+            ssid = cookies_dict.get('ssid')
+            if not ssid:
+                logging.error("No SSID found in session cookies")
+                return False, "Missing SSID"
+
+            self.start_websocket()
+            # Send ssid to validate session
+            request_id = str(randint(1000000, 9999999))
+            self.send_websocket_request(
+                name="ssid",
+                msg=ssid,
+                request_id=request_id
+            )
+            # Wait for WebSocket connection
+            start_time = time.time()
+            while time.time() - start_time < 5:
+                if global_value.check_websocket_if_connect:
+                    logging.info("WebSocket connected")
+                    return True, None
+                time.sleep(0.5)
+            
+            logging.error("WebSocket connection timed out")
+            return False, "WebSocket connection timeout"
+        except Exception as e:
+            logging.error(f"connect_without_login failed: {str(e)}")
+            return False, str(e)

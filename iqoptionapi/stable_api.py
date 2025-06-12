@@ -79,76 +79,60 @@ class IQ_Option:
         self.SESSION_COOKIE = cookie
 
     def connect(self, sms_code=None):
-        try:
-            self.api.close()
-        except:
-            pass
-            # logging.error('**warning** self.api.close() fail')
-
-        self.api = IQOptionAPI(
-            "iqoption.com", self.email, self.password)
-        check = None
-
-        # 2FA--
-        if sms_code is not None:
-            self.api.setTokenSMS(self.resp_sms)
-            status, reason = self.api.connect2fa(sms_code)
-            if not status:
-                return status, reason
-        # 2FA--
-
-        self.api.set_session(headers=self.SESSION_HEADER,
-                             cookies=self.SESSION_COOKIE)
-
-        check, reason = self.api.connect()
-
-        if check == True:
-            # -------------reconnect subscribe_candle
-            self.re_subscribe_stream()
-
-            # ---------for async get name: "position-changed", microserviceName
-            while global_value.balance_id == None:
+            try:
+                self.api.close()
+            except:
                 pass
 
-            self.position_change_all(
-                "subscribeMessage", global_value.balance_id)
+            self.api = IQOptionAPI("iqoption.com", self.email, self.password)
+            check = None
 
-            self.order_changed_all("subscribeMessage")
-            self.api.setOptions(1, True)
+            # 2FA--
+            if sms_code is not None:
+                self.api.setTokenSMS(self.resp_sms)
+                status, reason = self.api.connect2fa(sms_code)
+                if not status:
+                    return status, reason
+            # 2FA--
 
-            """
-            self.api.subscribe_position_changed(
-                "position-changed", "multi-option", 2)
+            self.api.set_session(headers=self.SESSION_HEADER, cookies=self.SESSION_COOKIE)
+            check, reason = self.api.connect()
 
-            self.api.subscribe_position_changed(
-                "trading-fx-option.position-changed", "fx-option", 3)
-
-            self.api.subscribe_position_changed(
-                "position-changed", "crypto", 4)
-
-            self.api.subscribe_position_changed(
-                "position-changed", "forex", 5)
-
-            self.api.subscribe_position_changed(
-                "digital-options.position-changed", "digital-option", 6)
-
-            self.api.subscribe_position_changed(
-                "position-changed", "cfd", 7)
-            """
-
-            # self.get_balance_id()
-            return True, None
-        else:
-            if json.loads(reason)['code'] == 'verify':
-                response = self.api.send_sms_code(json.loads(reason)['token'])
-
-                if response.json()['code'] != 'success':
-                    return False, response.json()['message']
-
-                # token_sms
-                self.resp_sms = response
-                return False, "2FA"
-            return False, reason
+            if check == True:
+                self.re_subscribe_stream()
+                while global_value.balance_id == None:
+                    pass
+                self.position_change_all("subscribeMessage", global_value.balance_id)
+                self.order_changed_all("subscribeMessage")
+                self.api.setOptions(1, True)
+                return True, None
+            else:
+                if json.loads(reason).get('code') == 'verify':
+                    try:
+                        response = self.api.send_sms_code(json.loads(reason)['token'])
+                        if response.json()['code'] != 'success':
+                            logging.error(f"SMS code request failed: {response.json()['message']}")
+                            return False, response.json()['message']
+                        self.resp_sms = response
+                        # Prompt for manual SMS code input
+                        print("2FA required. An SMS has been sent to your registered phone number.")
+                        sms_code = input("Enter the SMS code: ").strip()
+                        try:
+                            sms_code = int(sms_code)  # Convert to integer as required by connect_2fa
+                            status, reason = self.connect_2fa(sms_code)
+                            if status:
+                                logging.info("2FA authentication successful")
+                                return True, None
+                            else:
+                                logging.error(f"2FA authentication failed: {reason}")
+                                return False, reason
+                        except ValueError:
+                            logging.error("Invalid SMS code format. Please enter a numeric code.")
+                            return False, "Invalid SMS code format"
+                    except Exception as e:
+                        logging.error(f"2FA process failed: {str(e)}")
+                        return False, str(e)
+                return False, reason
 
     # self.update_ACTIVES_OPCODE()
 
@@ -1608,3 +1592,64 @@ class IQ_Option:
             return True, digital_order_id
         else:
             return False, digital_order_id
+
+    def get_session_cookies(self):
+        """Retrieve the current session cookies as a dictionary."""
+        try:
+            cookies = self.api.session.cookies.get_dict()
+            logging.debug(f"Retrieved session cookies: {cookies}")
+            return cookies
+        except Exception as e:
+            logging.error(f"Failed to get session cookies: {str(e)}")
+            return {}
+
+    @property
+    def ssid(self):
+        """Retrieve the ssid from session cookies."""
+        try:
+            cookies = self.get_session_cookies()
+            ssid = cookies.get('ssid')
+            if not ssid:
+                logging.warning("SSID not found in session cookies")
+            return ssid
+        except Exception as e:
+            logging.error(f"Failed to retrieve SSID: {str(e)}")
+            return None
+
+    def connect_without_login(self, cookies):
+        """Attempt to reconnect using existing session cookies."""
+        try:
+            # Ensure API is closed before reconnecting
+            self.api.close()
+        except:
+            pass
+
+        self.api = IQOptionAPI("iqoption.com", self.email, self.password)
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1.0 Safari/605.1.1"
+        }
+        logging.info(f"Setting session with headers: {headers}, cookies: {cookies}")
+        self.api.set_session(headers=headers, cookies=cookies)
+
+        # Attempt to establish WebSocket connection
+        check, reason = self.api.connect_without_login(headers=headers, cookies=cookies)
+
+        if check:
+            # Validate session by checking profile
+            profile = self.get_profile_ansyc()
+            if profile is not None:
+                logging.info("Session validated, re-subscribing streams")
+                self.re_subscribe_stream()
+                while global_value.balance_id is None:
+                    time.sleep(0.1)
+                self.position_change_all("subscribeMessage", global_value.balance_id)
+                self.order_changed_all("subscribeMessage")
+                self.api.setOptions(1, True)
+                logging.info("Successfully reconnected using existing session")
+                return True, None
+            else:
+                logging.error("Session invalid: No profile data received")
+                return False, "No profile data"
+        else:
+            logging.error(f"Failed to reconnect with existing session: {reason}")
+            return False, reason
