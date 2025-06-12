@@ -1,5 +1,6 @@
 ## Community based API for IQ Option
 - Do note that I am not actively developing this API *publicly* so I may or may not update this repository at all.
+- PLEASE, feel free to do pull request or create an issue if you found an issue that I might be able to fix.
 
 # Use the original documentation which is:
 https://iqoptionapi.github.io/iqoptionapi
