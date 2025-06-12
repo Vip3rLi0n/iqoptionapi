@@ -6,7 +6,7 @@
 https://iqoptionapi.github.io/iqoptionapi
 
 # Using session.json
-- This is just an example for now, since I am not configuring a proper format yet. If you want to skip 2fa/login, just login from browser and get the ssid and the timestamp and paste here.
+- This is the template for now, since I am not configuring a proper format yet. If you want to skip 2fa/login, just login from browser and get the ssid and the timestamp and paste here.
 ```json
 {
   "ssid": "example123",
