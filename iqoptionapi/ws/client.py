@@ -71,10 +71,18 @@ class WebsocketClient(object):
             <iqoptionapi.api.IQOptionAPI>`.
         """
         self.api = api
+        websocket.enableTrace(False)
+        logging.getLogger('websocket').setLevel(logging.WARNING)
         self.wss = websocket.WebSocketApp(
-            self.api.wss_url, on_message=self.on_message,
-            on_error=self.on_error, on_close=self.on_close,
-            on_open=self.on_open)
+            self.api.wss_url,
+            on_message=self.on_message,
+            on_error=self.on_error,
+            on_close=self.on_close,
+            on_open=self.on_open,
+            header={
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            }
+        )
 
     def dict_queue_add(self, dict, maxdict, key1, key2, key3, value):
         if key3 in dict[key1][key2]:
@@ -99,76 +107,83 @@ class WebsocketClient(object):
                 del obj[k]
                 break
 
-    def on_message(self, message):  # pylint: disable=unused-argument
+    def on_message(self, ws, message):  # pylint: disable=unused-argument
         """Method to process websocket messages."""
         global_value.ssl_Mutual_exclusion = True
         logger = logging.getLogger(__name__)
         logger.debug(message)
 
-        message = json.loads(str(message))
+        try:
+            message = json.loads(str(message))
+        except json.JSONDecodeError:
+            logger.error("Failed to decode message: %s", message)
+            global_value.ssl_Mutual_exclusion = False
+            return
 
-
-        technical_indicators(self.api, message, self.api_dict_clean)
-        time_sync(self.api, message)
-        heartbeat(self.api, message)
-        balances(self.api, message)
-        profile(self.api, message)
-        balance_changed(self.api, message)
-        candles(self.api, message)
-        buy_complete(self.api, message)
-        option(self.api, message)
-        position_history(self.api, message)
-        list_info_data(self.api, message)
-        candle_generated_realtime(self.api, message, self.dict_queue_add)
-        candle_generated_v2(self.api, message, self.dict_queue_add)
-        commission_changed(self.api, message)
-        socket_option_opened(self.api, message)
-        api_option_init_all_result(self.api, message)
-        initialization_data(self.api, message)
-        underlying_list(self.api, message)
-        instruments(self.api, message)
-        financial_information(self.api, message)
-        position_changed(self.api, message)
-        option_opened(self.api, message)
-        option_closed(self.api, message)
-        top_assets_updated(self.api, message)
-        strike_list(self.api, message)
-        api_game_betinfo_result(self.api, message)
-        traders_mood_changed(self.api, message)
-         # ------for forex&cfd&crypto..
-        order_placed_temp(self.api, message)
-        order(self.api, message)
-        position(self.api, message)
-        positions(self.api, message)
-        order_placed_temp(self.api, message)
-        deferred_orders(self.api, message)
-        history_positions(self.api, message)
-        available_leverages(self.api, message)
-        order_canceled(self.api, message)
-        position_closed(self.api, message)
-        overnight_fee(self.api, message)
-        api_game_getoptions_result(self.api, message)
-        sold_options(self.api, message)
-        tpsl_changed(self.api, message)
-        auto_margin_call_changed(self.api, message)
-        digital_option_placed(self.api, message, self.api_dict_clean)
-        result(self.api, message)
-        instrument_quotes_generated(self.api, message)
-        training_balance_reset(self.api, message)
-        socket_option_closed(self.api, message)
-        live_deal_binary_option_placed(self.api, message)
-        live_deal_digital_option(self.api, message)
-        leaderboard_deals_client(self.api, message)
-        live_deal(self.api, message)
-        user_profile_client(self.api, message)
-        leaderboard_userinfo_deals_client(self.api, message)
-        users_availability(self.api, message)
-        client_price_generated(self.api, message)
-
-        global_value.ssl_Mutual_exclusion = False
+        try:
+            technical_indicators(self.api, message, self.api_dict_clean)
+            time_sync(self.api, message)
+            heartbeat(self.api, message)
+            balances(self.api, message)
+            profile(self.api, message)
+            balance_changed(self.api, message)
+            candles(self.api, message)
+            buy_complete(self.api, message)
+            option(self.api, message)
+            position_history(self.api, message)
+            list_info_data(self.api, message)
+            candle_generated_realtime(self.api, message, self.dict_queue_add)
+            candle_generated_v2(self.api, message, self.dict_queue_add)
+            commission_changed(self.api, message)
+            socket_option_opened(self.api, message)
+            api_option_init_all_result(self.api, message)
+            initialization_data(self.api, message)
+            underlying_list(self.api, message)
+            instruments(self.api, message)
+            financial_information(self.api, message)
+            position_changed(self.api, message)
+            option_opened(self.api, message)
+            option_closed(self.api, message)
+            top_assets_updated(self.api, message)
+            strike_list(self.api, message)
+            api_game_betinfo_result(self.api, message)
+            traders_mood_changed(self.api, message)
+            # ------for forex&cfd&crypto..
+            order_placed_temp(self.api, message)
+            order(self.api, message)
+            position(self.api, message)
+            positions(self.api, message)
+            order_placed_temp(self.api, message)
+            deferred_orders(self.api, message)
+            history_positions(self.api, message)
+            available_leverages(self.api, message)
+            order_canceled(self.api, message)
+            position_closed(self.api, message)
+            overnight_fee(self.api, message)
+            api_game_getoptions_result(self.api, message)
+            sold_options(self.api, message)
+            tpsl_changed(self.api, message)
+            auto_margin_call_changed(self.api, message)
+            digital_option_placed(self.api, message, self.api_dict_clean)
+            result(self.api, message)
+            instrument_quotes_generated(self.api, message)
+            training_balance_reset(self.api, message)
+            socket_option_closed(self.api, message)
+            live_deal_binary_option_placed(self.api, message)
+            live_deal_digital_option(self.api, message)
+            leaderboard_deals_client(self.api, message)
+            live_deal(self.api, message)
+            user_profile_client(self.api, message)
+            leaderboard_userinfo_deals_client(self.api, message)
+            users_availability(self.api, message)
+            client_price_generated(self.api, message)
+        except Exception as e:
+            logger.error("Error processing message: %s", str(e))
+        finally:
+            global_value.ssl_Mutual_exclusion = False
 
     @staticmethod
-    def on_error(wss, error):  # pylint: disable=unused-argument
+    def on_error(ws, error):  # pylint: disable=unused-argument
         """Method to process websocket errors."""
         logger = logging.getLogger(__name__)
         logger.error(error)
@@ -176,15 +191,15 @@ class WebsocketClient(object):
         global_value.check_websocket_if_error = True
 
     @staticmethod
-    def on_open(wss):  # pylint: disable=unused-argument
+    def on_open(ws):  # pylint: disable=unused-argument
         """Method to process websocket open."""
         logger = logging.getLogger(__name__)
         logger.debug("Websocket client connected.")
         global_value.check_websocket_if_connect = 1
 
     @staticmethod
-    def on_close(wss):  # pylint: disable=unused-argument
+    def on_close(ws, close_status_code=None, close_msg=None):  # pylint: disable=unused-argument
         """Method to process websocket close."""
         logger = logging.getLogger(__name__)
-        logger.debug("Websocket connection closed.")
+        logger.debug("Websocket connection closed. Status code: %s, Message: %s", close_status_code, close_msg)
         global_value.check_websocket_if_connect = 0
